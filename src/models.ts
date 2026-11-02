@@ -84,8 +84,14 @@ function getEnrichmentLookup(): Map<string, ModelLookupItem> {
 	return lookup;
 }
 
+function findEnrichedModel(modelId: string): ModelLookupItem | undefined {
+	const normalizedId = modelId.replaceAll(".", "-").toLowerCase();
+	const lookup = getEnrichmentLookup();
+	return lookup.get(normalizedId) ?? lookup.get(normalizedId.slice(normalizedId.indexOf("/") + 1));
+}
+
 export function isEnrichedModelId(modelId: string): boolean {
-	return getEnrichmentLookup().has(modelId.replaceAll(".", "-").toLowerCase());
+	return findEnrichedModel(modelId) !== undefined;
 }
 
 export interface ModelApiOverrideRule {
@@ -186,14 +192,12 @@ export function buildProviderModels(params: {
 	modelApiOverrides: Record<string, string>;
 }): ProviderModelConfig[] {
 	const { providerName, baseUrl, apiModels, ratios, modelApiOverrides } = params;
-	const enrichmentLookup = getEnrichmentLookup();
 	const { rules, errors } = compileModelApiOverrides(modelApiOverrides);
 	for (const error of errors) console.warn(`NewAPI [${providerName}]: modelApiOverrides ${error} — ignoring it.`);
 	const models: ProviderModelConfig[] = [];
 
 	for (const modelEntry of apiModels) {
-		const normalizedId = modelEntry.id.replaceAll(".", "-").toLowerCase();
-		const enriched = enrichmentLookup.get(normalizedId);
+		const enriched = findEnrichedModel(modelEntry.id);
 		const gatewayApis = new Set<NewAPIModelApi>();
 		for (const type of modelEntry.supportedEndpointTypes) {
 			for (const candidate of ENDPOINT_TYPE_TO_APIS[type] ?? []) gatewayApis.add(candidate);
